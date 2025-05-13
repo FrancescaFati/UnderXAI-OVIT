@@ -43,9 +43,6 @@ parameters:
   clinical_encoding_dim:
     value: 4
 
-  contrastive: 
-    value: 'None'
-
   dropout:
     value: 0.25
     

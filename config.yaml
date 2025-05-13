@@ -29,8 +29,6 @@ clinical_features:  True
 
 clinical_input_dim:  4
 
-contrastive:  'None'
-
 dropout: 0.25
 
 early_stopping_patience:  70

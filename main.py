@@ -3,7 +3,7 @@ import torch
 from pathlib import Path
 from datetime import datetime
 from torch.utils.data import DataLoader
-from ds import PCSDataset
+from pcs_dataset import PCSDataset
 from engine import Engine
 from model import Vit_Classifier, Slice_Contrastive, Volume_Contrastive
 from eval import ModelEvaluator
@@ -24,140 +24,37 @@ def sweep(config=None):
         name=f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     ):        
      
-        if config['contrastive'] == "slice": 
-            model = Slice_Contrastive(config).to(device)
-            print("Model loaded")    
-            
-            train_dataset = PCSDataset(
-                data_file=config['train_paths'],
-                excluded_years=[2015],
-                transform=None,
-                is_training=True, 
-                seg = True, 
-                im_bucket = False, 
-                seg_bucket = False, 
-                return_2d_slices = True, 
-                r0r1_r2  = False,
-                im_masked  = False,  
-            )
-            val_dataset = PCSDataset(
-                data_file=config['val_paths'],
-                excluded_years=[2015],
-                transform=None,
-                is_training=False, 
-                seg = True, 
-                im_bucket = False, 
-                seg_bucket = False, 
-                return_2d_slices = True, 
-                r0r1_r2  = False,
-                im_masked  = False,  
-            )      
-            test_dataset = PCSDataset(
-                data_file=config['test_paths'],
-                excluded_years=[2015],
-                transform=None,
-                is_training=False, 
-                seg = True, 
-                im_bucket = False, 
-                seg_bucket = False, 
-                return_2d_slices = True, 
-                r0r1_r2  = False,
-                im_masked  = False,  
-            )      
-                 
-        elif config ['contrastive']== 'volume': 
-            model = Volume_Contrastive(config).to(device)
-            print("Model loaded")    
-            
-            train_dataset = PCSDataset(
-                data_file=config['train_paths'],
-                excluded_years=[2015],
-                transform=None,
-                is_training=True, 
-                seg = False, 
-                im_bucket = False, 
-                seg_bucket = False, 
-                return_2d_slices = False, 
-                r0r1_r2  = False,
-                im_masked  = False,  
-                contrastive = True
-            )
-            val_dataset = PCSDataset(
-                data_file=config['val_paths'],
-                excluded_years=[2015],
-                transform=None,
-                is_training=False, 
-                seg = False, 
-                im_bucket = False, 
-                seg_bucket = False, 
-                return_2d_slices = False, 
-                r0r1_r2  = False,
-                im_masked  = False,  
-                contrastive = True, 
-            )      
-            test_dataset = PCSDataset(
-                data_file=config['test_paths'],
-                excluded_years=[2015],
-                transform=None,
-                is_training=False, 
-                seg = False, 
-                im_bucket = False, 
-                seg_bucket = False, 
-                return_2d_slices = False, 
-                r0r1_r2  = False,
-                im_masked  = False,  
-                contrastive = True, 
-            )           
+
+        model = Vit_Classifier(config).to(device)
+        print("Model loaded")    
         
-        else: 
-            model = Vit_Classifier(config).to(device)
-            print("Model loaded")    
-            
-            train_dataset = PCSDataset(
-                data_file=config['train_paths'],
-                excluded_years=[2015],
-                transform=None,
-                is_training=True, 
-                seg = False, 
-                im_bucket = False, 
-                seg_bucket = False, 
-                return_2d_slices = False, 
-                r0r1_r2  = config['r0r1_r2'],
-                im_masked  = False,  
-                contrastive = False, 
-                seg_as_im = False,
-                clinical_fe=False,
-            )
-            val_dataset = PCSDataset(
-                data_file=config['val_paths'],
-                excluded_years=[2015],
-                transform=None,
-                is_training=False, 
-                seg = False, 
-                im_bucket = False, 
-                seg_bucket = False, 
-                return_2d_slices = False, 
-                r0r1_r2  = config['r0r1_r2'],
-                im_masked  = False,  
-                contrastive = False, 
-                seg_as_im = False,
-                clinical_fe=False,
-            )      
-            test_dataset = PCSDataset(
-                data_file=config['test_paths'],
-                excluded_years=[2015],
-                transform=None,
-                is_training=False, 
-                seg = False, 
-                im_bucket = False, 
-                seg_bucket = False, 
-                return_2d_slices = False, 
-                r0r1_r2  = config['r0r1_r2'],
-                im_masked  = False,  
-                contrastive = False, 
-                seg_as_im = False,
-                clinical_fe=False,
-            )           
+        train_dataset = PCSDataset(
+            data_file=config['train_paths'],
+            excluded_years=[2015],
+            transform=None,
+            is_training=True, 
+            seg = False, 
+            seg_as_im = False,
+            clinical_fe=False,
+        )
+        val_dataset = PCSDataset(
+            data_file=config['val_paths'],
+            excluded_years=[2015],
+            transform=None,
+            is_training=False, 
+            seg = False, 
+            seg_as_im = False,
+            clinical_fe=False,
+        )      
+        test_dataset = PCSDataset(
+            data_file=config['test_paths'],
+            excluded_years=[2015],
+            transform=None,
+            is_training=False, 
+            seg = False, 
+            seg_as_im = False,
+            clinical_fe=False,
+        )           
                     
                         
         train_loader = DataLoader(
