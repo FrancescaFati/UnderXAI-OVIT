@@ -1,0 +1,165 @@
+program: wbsweep.py 
+
+# Define the method for choosing new parameters value 
+# - grid search - iterate over every combination of hyperparameter value
+# - random search - select each new combination at random according to provided distribution S. 
+# - bayes(ian) search - create a probabilistic model of metric score as a function of the hyperparameters, and choose 
+# parameters with high probability of improving the metric. 
+
+method: grid
+
+metric: 
+  name: Validation/f1_score
+  goal: maximize
+
+project: underxai
+#entity: underxai
+
+parameters:
+  accumulation_steps:
+    value: 16
+
+  adapter: 
+    value: 
+
+  attention_pooling: 
+    value: 'contextual'
+
+  attention_resc: 
+    value: 2
+
+  batch_size:
+    value: 8
+
+  beta: 
+    value: 1
+
+  clinical_features: 
+    value: False
+  
+  clinical_input_dim: 
+    value: 4
+  
+  clinical_encoding_dim:
+    value: 4
+
+  contrastive: 
+    value: 'None'
+
+  dropout:
+    value: 0.25
+    
+  early_stopping_patience: 
+    value: 70
+
+  epochs:
+    value: 100
+
+  feature_extractor:
+    values: ["dinov2-small", "google-32"]
+
+  gradient_clip:
+    value: -2
+
+  label_smoothing:
+    value: 0
+  
+  learning_rate:
+    value: 1.0e-4
+
+  loss_function:
+    value: 'WBCE'  # SUPCONLOSS
+
+  mask: 
+    value: True
+
+  mask_att: 
+    value: False
+    
+  mixup_alpha:
+    value: 0
+
+  n_splits:
+    value: 50
+
+  num_classes:
+    value: 1
+
+  num_heads:   #NOT CALLED
+    value: 4
+
+  optimizer:
+    value: 'adamW'  # Changed to AdamW
+
+  query: 
+    value: "im"
+
+  r0r1_r2:
+    value: False
+  
+  scheduler_gamma:
+    value: 0.5
+
+  scheduler_patience:
+    value: 60
+
+  scheduler_step: 
+    value: 5
+
+  scheduler_type:
+    value: 'step'
+
+  train_paths:
+    value: '/home/ffati/DATA/train_dataset_ids.json'
+
+  val_paths:
+    value: '/home/ffati/DATA/val_dataset_ids.json'
+
+  test_paths:
+    value: '/home/ffati/DATA/test_dataset_ids.json'
+
+  temperature: 
+    value: 0.07
+
+  warmup_steps:
+    value: -1
+
+  weight_decay:
+    value: 1.0e-6
+    
+
+
+
+    
+
+    
+
+    
+
+    
+
+    
+
+  
+
+  
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+    
+
+

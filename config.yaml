@@ -1,0 +1,87 @@
+
+# program: wbsweep.py 
+
+# # Define the method for choosing new parameters values 
+# # - grid search - iterate over every combination of hyperparameter values
+# # - random search - select each new combination at random according to provided distribution S. 
+# # - bayes(ian) search - create a probabilistic model of metric score as a function of the hyperparameters, and choose 
+# # parameters with high probability of improving the metric. 
+
+# method: grid
+
+
+
+accumulation_steps: 16
+
+adapter:  False
+
+attention_pooling: 'contextual'
+
+attention_resc:  2
+
+batch_size: 8
+
+beta:  1
+
+clinical_encoding_dim: 4
+
+clinical_features:  True
+
+clinical_input_dim:  4
+
+contrastive:  'None'
+
+dropout: 0.25
+
+early_stopping_patience:  70
+
+epochs: 1
+
+feature_extractor: "google-32"
+
+gradient_clip: -2
+
+label_smoothing: 0
+
+learning_rate: 0.0001
+
+loss_function: 'WBCE'  # SUPCONLOSS
+
+mask:  False
+
+mask_att : False
+  
+mixup_alpha: 0
+
+n_splits: 50
+
+num_classes: 1
+
+num_heads: 4
+
+optimizer: 'adamW'  # Changed to AdamW
+
+query: "im"
+
+r0r1_r2: False
+
+scheduler_gamma: 0.5
+
+scheduler_patience: 60
+
+scheduler_step: 5
+
+scheduler_type: 'step'
+
+train_paths: '/home/ffati/DATA/train_dataset_ids.json'
+
+val_paths: '/home/ffati/DATA/val_dataset_ids.json'
+
+test_paths: '/home/ffati/DATA/test_dataset_ids.json'
+
+temperature:  0.07
+
+warmup_steps: -1
+
+weight_decay: 1.0e-6
+
