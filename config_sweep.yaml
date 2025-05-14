@@ -1,43 +1,36 @@
-program: wbsweep.py 
+# Example sweep configuration for hyperparameter optimization with wandb
+# Copy and edit this file as needed for your experiments and environment.
 
-# Define the method for choosing new parameters value 
-# - grid search - iterate over every combination of hyperparameter value
-# - random search - select each new combination at random according to provided distribution S. 
-# - bayes(ian) search - create a probabilistic model of metric score as a function of the hyperparameters, and choose 
-# parameters with high probability of improving the metric. 
+program: wbsweep.py
 
+# --- Sweep/Hyperparameter Search Settings ---
+# method: grid  # Options: grid, random, bayes
 method: grid
 
-metric: 
+# --- Metric to Optimize ---
+metric:
   name: Validation/f1_score
   goal: maximize
 
+# --- wandb Project Info ---
 project: underxai
-#entity: underxai
+# entity: your_wandb_entity  # Uncomment and set if needed
 
+# --- Hyperparameter Search Space ---
 parameters:
   accumulation_steps:
     value: 16
 
-  adapter: 
-    value: 
-
-  attention_pooling: 
-    value: 'contextual'
-
-  attention_resc: 
+  attention_resc:
     value: 2
 
   batch_size:
     value: 8
 
-  beta: 
-    value: 1
-
-  clinical_features: 
+  clinical_features:
     value: False
   
-  clinical_input_dim: 
+  clinical_input_dim:
     value: 4
   
   clinical_encoding_dim:
@@ -46,7 +39,7 @@ parameters:
   dropout:
     value: 0.25
     
-  early_stopping_patience: 
+  early_stopping_patience:
     value: 70
 
   epochs:
@@ -54,92 +47,47 @@ parameters:
 
   feature_extractor:
     values: ["dinov2-small", "google-32"]
-
-  gradient_clip:
-    value: -2
-
-  label_smoothing:
-    value: 0
   
   learning_rate:
     value: 1.0e-4
 
   loss_function:
-    value: 'WBCE'  # SUPCONLOSS
-
-  mask: 
-    value: True
-
-  mask_att: 
-    value: False
-    
-  mixup_alpha:
-    value: 0
-
-  n_splits:
-    value: 50
+    value: 'WBCE'  
 
   num_classes:
     value: 1
 
-  num_heads:   #NOT CALLED
+  num_heads:
     value: 4
 
   optimizer:
-    value: 'adamW'  # Changed to AdamW
+    value: 'adamW' 
 
-  query: 
-    value: "im"
-
-  r0r1_r2:
-    value: False
-  
   scheduler_gamma:
     value: 0.5
 
   scheduler_patience:
     value: 60
 
-  scheduler_step: 
+  scheduler_step:
     value: 5
 
   scheduler_type:
     value: 'step'
-
-  train_paths:
-    value: '/home/ffati/DATA/train_dataset_ids.json'
-
-  val_paths:
-    value: '/home/ffati/DATA/val_dataset_ids.json'
-
-  test_paths:
-    value: '/home/ffati/DATA/test_dataset_ids.json'
-
-  temperature: 
-    value: 0.07
-
-  warmup_steps:
-    value: -1
-
+  
   weight_decay:
     value: 1.0e-6
-    
 
 
+  # --- Data Paths ---
+  # Set these to the correct locations for your data files
+  train_paths:
+    value: 'PATH/TO/train_dataset_ids.json'  # e.g., './data/train_dataset_ids.json'
+  val_paths:
+    value: 'PATH/TO/val_dataset_ids.json'    # e.g., './data/val_dataset_ids.json'
+  test_paths:
+    value: 'PATH/TO/test_dataset_ids.json'   # e.g., './data/test_dataset_ids.json'
 
-    
-
-    
-
-    
-
-    
-
-    
-
-  
-
-  
 
 
 

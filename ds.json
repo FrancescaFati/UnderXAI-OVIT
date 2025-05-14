@@ -1,0 +1,35 @@
+{"patients":[
+    {
+        "Record ID": "IEO201810",
+        "Age at diagnosis": 75,
+        "Charlson Comorbidity Index": 1,
+        "BMI (kg/m^2)": 23.3,
+        "CA125 (U/mL)": 1298.7,
+        "HE4 (pmol/l)": 774.8,
+        "Type of surgery": -1,
+        "Residual tumor": 2,
+        "Residual tumor: notes": -1,
+        "FF Residual tumor: notes": "open/close",
+        "Ovarian/Peritoneum/Fallopian Tube Cancer FIGO Staging": -1,
+        "year": 2016,
+        "image_path": "/home/ffati/DATA/PCS/2016/pth/IEO201612/CT_filtered.pth",
+        "segmentation_path": "PCS/2018/nii/IEO201810/ovseg_predictions_pod_om/CT_masked.nii.gz"
+    }, 
+    {
+        "Record ID": "IEO20161",
+        "Age at diagnosis": 75,
+        "Charlson Comorbidity Index": 1,
+        "BMI (kg/m^2)": 23.3,
+        "CA125 (U/mL)": 1298.7,
+        "HE4 (pmol/l)": 774.8,
+        "Type of surgery": -1,
+        "Residual tumor": 2,
+        "Residual tumor: notes": -1,
+        "FF Residual tumor: notes": "open/close",
+        "Ovarian/Peritoneum/Fallopian Tube Cancer FIGO Staging": -1,
+        "year": 2016,
+        "image_path": "/home/ffati/DATA/PCS/2016/pth/IEO201612/CT_filtered.pth",
+        "segmentation_path": "PCS/2016/nii/IEO20161/ovseg_predictions_pod_om/CT_masked.nii.gz"
+    }
+
+]}

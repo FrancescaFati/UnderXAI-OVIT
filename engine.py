@@ -1,20 +1,37 @@
+"""
+Engine module for PCS classification training and evaluation.
+
+- Handles training, validation, and logging (optionally to wandb).
+- Designed for public sharing: no user-specific or hardcoded paths.
+- Optional dependencies (wandb, matplotlib, seaborn) are handled gracefully.
+"""
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import wandb
 import numpy as np
 from typing import Dict
 from torch.amp import GradScaler
-from torchmetrics.functional.classification import binary_f1_score
 from datetime import datetime
 from rich import print
 from rich.console import Console
 from rich.theme import Theme
-from utilis import FocalLoss, SurrogateFbetaLoss, SupConLoss
-import matplotlib.pyplot as plt
-from sklearn.utils.class_weight import compute_class_weight
 import metrics
-import seaborn as sns
+
+# Optional dependencies
+try:
+    import wandb
+except ImportError:
+    wandb = None
+    print("[yellow]wandb is not installed. Logging to wandb will be disabled.[/yellow]")
+
+try:
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+except ImportError:
+    plt = None
+    sns = None
+    print("[yellow]matplotlib or seaborn is not installed. Attention plotting will be disabled.[/yellow]")
 
 custom_theme = Theme(
     {
@@ -26,15 +43,19 @@ custom_theme = Theme(
     }
 )
 
-   
-def log_attention_weights(att_weights, step, prefix="Training", save = False, save_path =''):
-    """Log attention matrix visualization to W&B."""
+
+def log_attention_weights(att_weights, step, prefix="Training", save=False, save_path=''):
+    """
+    Log attention matrix visualization to W&B (if available) and optionally save to disk.
+    This function is robust to missing plotting/logging libraries.
+    """
+    if plt is None or sns is None:
+        print("[yellow]matplotlib/seaborn not available: skipping attention plotting.[/yellow]")
+        return
     if torch.is_tensor(att_weights):
         att_weights = att_weights.cpu().detach().numpy()
-    
     num_samples = min(att_weights.shape[0], 4)
     fig, axes = plt.subplots(1, num_samples, figsize=(5*num_samples, 5))
-    
     for sample_idx in range(num_samples):
         ax = axes[sample_idx] if num_samples > 1 else axes
         sns.heatmap(att_weights[sample_idx], 
@@ -43,34 +64,34 @@ def log_attention_weights(att_weights, step, prefix="Training", save = False, sa
                    xticklabels=False, 
                    yticklabels=False)
         ax.set_title(f'Sample {sample_idx + 1}')
-    
     plt.tight_layout()
-    wandb.log({f"{prefix}/attention_matrix": wandb.Image(fig),"epoch":step},)
-    
+    if wandb is not None:
+        # Log the attention matrix as an image to wandb
+        wandb.log({f"{prefix}/attention_matrix": wandb.Image(fig),"epoch":step},)
     if save: 
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Plot saved as: {save_path}")
-        
     plt.close()
 
 
 class Engine:
-    def __init__(self, model, config, train_loader, val_loader, device): #?ALBE
+    """
+    Training and evaluation engine for PCS classification models.
+    Handles training, validation, logging, and checkpointing.
+    """
+    def __init__(self, model, config, train_loader, val_loader, device):
+        # Set up rich console for colored output
         self.console = Console(theme=custom_theme)
         self.model = model
         self.config = config
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-        # Calculate class weights \ training data
-        if self.config['contrastive'] == 'None': 
-            self.class_weights = self._compute_class_weights()
-            self.class_weights_sk = self._compute_class_weights_sklearn()
-            self.pos_weights = self._compute_pos_weight()
-        # Modified initialization with better defaults
+        # Compute positive class weights for imbalanced data
+        self.pos_weights = self._compute_pos_weight()
+        # Select loss function based on config
         self.criterion = self.get_criterion()
-
+        # AdamW optimizer with config parameters
         self.optimizer = optim.AdamW(
             self.model.parameters(),
             lr=self.config["learning_rate"],
@@ -78,9 +99,8 @@ class Engine:
             betas=(0.9, 0.999),
             eps=1e-8,
         )
-
+        # Scheduler for learning rate warmup and reduction
         self.warmup_steps = config.get("warmup_steps", 100)
-        
         self.main_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
             self.optimizer,
             mode="min",
@@ -89,21 +109,22 @@ class Engine:
             min_lr=1.e-8,
             threshold=1.e-4,
         )
-        
+        # Secondary scheduler (cosine or step) for additional LR scheduling
         schedulers = {
         'cosine': optim.lr_scheduler.CosineAnnealingLR(
             self.optimizer,
-            T_max=config["epochs"]*len(train_loader)/config['scheduler_step'],  # Will cycle through a cosine with 10 peaks
+            T_max=config["epochs"]*len(train_loader)/config['scheduler_step'],  
             eta_min=0
         ),
         'step': optim.lr_scheduler.StepLR(
             self.optimizer, 
-            config["epochs"]*len(train_loader)/config['scheduler_step'], # Will have 6 steps
+            config["epochs"]*len(train_loader)/config['scheduler_step'], 
             gamma=config['scheduler_gamma'])
         }
         self.secondary_scheduler = schedulers[config["scheduler_type"]]
-
+        # For mixed precision training
         self.scaler = GradScaler()
+        # Track best validation loss and F1 for early stopping
         self.best_val_loss = float("inf")
         self.best_val_f1 = 0.0
         self.patience_counter = 0
@@ -112,116 +133,38 @@ class Engine:
         self.num_classes = config["num_classes"]
         self.batch_size = config["batch_size"]
         self.clinical_features = config["clinical_features"]
-
-        # Training stabilization
-        # self.label_smoothing = config.get('label_smoothing', 0.1)
+        # For gradient accumulation
         self.gradient_accumulation_steps = config.get("accumulation_steps", 1)
-        wandb.watch(self.model,log_freq=2,log="all")
-        wandb.define_metric("epoch")
-        wandb.define_metric("train", step_metric="epoch")
-        wandb.define_metric("val", step_metric="epoch")
-        
-        wandb.define_metric("Training", step_metric="epoch")
-        wandb.define_metric("Validation_OPTHR", step_metric="epoch")
-        wandb.define_metric("Validation", step_metric="epoch")
-        
-        wandb.define_metric("batch")
-        wandb.define_metric("hyperp", step_metric="batch")
-        wandb.define_metric("gradients", step_metric="batch")
-        wandb.define_metric("parameters", step_metric="batch")
+        # Set up wandb logging if available
+        if wandb is not None:
+            wandb.watch(self.model,log_freq=2,log="all")
+            wandb.define_metric("epoch")
+            wandb.define_metric("train", step_metric="epoch")
+            wandb.define_metric("val", step_metric="epoch")
+            wandb.define_metric("Training", step_metric="epoch")
+            wandb.define_metric("Validation_OPTHR", step_metric="epoch")
+            wandb.define_metric("Validation", step_metric="epoch")
+            wandb.define_metric("batch")
+            wandb.define_metric("hyperp", step_metric="batch")
+            wandb.define_metric("gradients", step_metric="batch")
+            wandb.define_metric("parameters", step_metric="batch")
 
-    def _compute_class_weights(self):
-        """Compute class weights from training data"""
-        all_labels = []
-    
-        # Collect all labels
-        for batch in self.train_loader:
-            labels = batch["label"]
-            # Ensure we're working with binary labels
-            binary_labels = (labels[:, 1] > 0.5).cpu().numpy()
-            all_labels.extend(binary_labels)
-        
-        # Convert to numpy array
-        labels_array = np.array(all_labels)
-        
-        # Compute class counts
-        class_counts = np.bincount(labels_array.astype(int), minlength=2)
-        
-        # Avoid division by zero
-        eps = 1e-8
-        class_counts = np.maximum(class_counts, eps)
-        
-        # Compute weights using different strategies
-        
-        # Option 1: Inverse frequency weighting
-        weights_inv = 1. / class_counts
-        weights_inv = weights_inv / weights_inv.sum()  # Normalize
-        
-        # # Option 2: Balanced weighting
-        # total_samples = len(labels_array)
-        # n_classes = 2
-        # weights_balanced = total_samples / (n_classes * class_counts)
-        # weights_balanced = weights_balanced / weights_balanced.sum()  # Normalize
-
-        # self.console.print(
-        #     f"Class distribution: [yellow]{counts}[/yellow]", style="epoch"
-        # )
-        # self.console.print(
-        #     f"Computed weights: [yellow]{weights}[/yellow]", style="epoch"
-        # )
-        return torch.tensor(weights_inv, device=self.device)
-    
-    def _compute_class_weights_sklearn(self):
-        """Compute class weights from training data using sklearn's implementation"""
-        all_labels = []
-    
-        # Collect all labels
-        for batch in self.train_loader:
-            labels = batch["label"]
-            # Ensure we're working with binary labels
-            binary_labels = (labels[:, 1] > 0.5).cpu().numpy()
-            all_labels.extend(binary_labels)
-    
-        # Convert to numpy array
-        labels_array = np.array(all_labels)
-    
-        # Get unique classes
-        classes = np.unique(labels_array)
-    
-        # Compute weights using sklearn's balanced approach
-        weights = compute_class_weight(
-            class_weight='balanced',
-            classes=classes,
-            y=labels_array
-        )
-    
-        # Convert to tensor and move to correct device
-        return torch.tensor(weights, device=self.device)
-    
     def _compute_pos_weight(self):
-        """Compute positive weight for BCEWithLogitsLoss from training data"""
+        """
+        Compute positive weight for BCEWithLogitsLoss from training data.
+        This helps address class imbalance by weighting the positive class.
+        """
         all_labels = []
-        
-        # Collect all labels
         for batch in self.train_loader:
             labels = batch["label"]
-            # Ensure we're working with binary labels
+            # Convert one-hot labels to binary (for binary classification)
             binary_labels = (labels[:, 1] > 0.5).cpu().numpy()
             all_labels.extend(binary_labels)
-        
-        # Convert to numpy array
         labels_array = np.array(all_labels)
-        
-        # Compute class counts [negative_count, positive_count]
         class_counts = np.bincount(labels_array.astype(int), minlength=2)
-        
-        # Avoid division by zero
-        eps = 1e-8
+        eps = 1e-8  # Avoid division by zero
         class_counts = np.maximum(class_counts, eps)
-        
-        # Compute pos_weight as negative_count / positive_count
         pos_weight = class_counts[0] / class_counts[1]
-        
         self.console.print(
             f"Class distribution: Negative={class_counts[0]}, Positive={class_counts[1]}", 
             style="epoch"
@@ -230,54 +173,29 @@ class Engine:
             f"Computed positive weight: {pos_weight:.4f}", 
             style="epoch"
         )
-        
         return torch.tensor([pos_weight], device=self.device)
 
     def get_criterion(self):
-        """Loss function"""
+        """
+        Return the loss function based on config.
+        Supports standard BCE and weighted BCE for class imbalance.
+        """
         if self.config["loss_function"] == "BCE":
             self.console.print(f"Using BCE loss", style="epoch")
             return nn.BCEWithLogitsLoss()
-
         elif self.config["loss_function"] == "WBCE":
             self.console.print(
                 f"Using BCE loss with positive weight:[yellow]{self.pos_weights.item():.4f}[/yellow]",
                 style="epoch",
             )
             return nn.BCEWithLogitsLoss(pos_weight=self.pos_weights)
-
-        elif self.config["loss_function"] == "WCE":
-            return nn.CrossEntropyLoss(weight=self.class_weights_sk)
-
-        elif self.config["loss_function"] == "FOCAL":
-            print(
-                f"Using Focal loss with alpha={self.class_weights.tolist()} and gamma=2.0"
-            )
-            return FocalLoss(alpha=self.class_weights[1].item(), gamma=2.0)
-        
-        elif self.config["loss_function"] == "FBETALOSS":
-            print(
-                f"Using Surroate FBeta loss with beta = 1 and p = 0.20"
-            )
-            return SurrogateFbetaLoss(beta=self.config["beta"], pos_proportion=0.20, num_classes= self.config["num_classes"])
-        elif self.config["loss_function"] == 'SUPCONLOSS': 
-            print(
-                f"Using Supervised Contrastive Loss"
-            )
-            return SupConLoss(temperature=self.config['temperature'])
-        
         raise ValueError(f"Unknown loss function: {self.config['loss_function']}")
 
-    def _apply_label_smoothing(self, targets):
-        """Apply label smoothing to binary targets"""
-        smoothed_targets = targets.clone()
-        smoothed_targets = (
-            smoothed_targets * (1 - self.label_smoothing) + self.label_smoothing / 2
-        )
-        return smoothed_targets
-    
     def format_tr_values(self,row, is_prediction=True):
-        """Helper function to format values as TR 0/TR 1 with colors"""
+        """
+        Format values as TR 0/TR 1 with colors for rich console output.
+        Used for displaying predictions and targets.
+        """
         formatted = []
         for val in row:
             val = round(float(val), 1)
@@ -287,7 +205,10 @@ class Engine:
         return formatted
     
     def format_truefalse_values(self,row):
-        """Helper function to format values as TR 0/TR 1 with colors"""
+        """
+        Format values as True/False with colors for rich console output.
+        Used for displaying accuracy results.
+        """
         formatted = []
         for val in row:
             val = round(float(val), 1)
@@ -319,8 +240,7 @@ class Engine:
         for batch_idx, batch in enumerate(self.train_loader):
 
             images = batch["image"].to(self.device)
-            #clinical_features = batch["clinical_features"].to(self.device)
-            #masks = batch["mask"].to(self.device)
+            clinical_features = batch["clinical_features"].to(self.device)
 
             if self.num_classes == 1:
                 labels = batch["label"][:, 1].to(self.device)
@@ -328,32 +248,20 @@ class Engine:
             else:
                 labels = batch["label"].to(self.device)
 
-            # # Apply label smoothing
-            # if self.label_smoothing > 0:
-            #     targets = self._apply_label_smoothing(targets)
 
             # Forward pass and loss calculation
-            # with autocast("cuda" if torch.cuda.is_available() else "cpu"):
-            logits, att_weights, pooled_fe = self.model(images)
+            logits, att_weights, _ = self.model(images, clinical_features)
 
             loss = self.criterion(logits, labels)
             scaled_loss = loss / self.gradient_accumulation_steps
 
-            # self.scaler.scale(scaled_loss).backward()
             scaled_loss.backward()
             accumulated_loss = loss.item()
 
             # Gradient clipping and optimizer step
             if (batch_idx + 1) % self.gradient_accumulation_steps == 0:
-                # if self.config["gradient_clip"] > 0:
-                #     # self.scaler.unscale_(self.optimizer)T
-                #     grad = torch.nn.utils.clip_grad_norm_(
-                #         self.model.parameters(), self.config["gradient_clip"]
-                #     )
 
                 self.optimizer.step()
-                # self.scaler.step(self.optimizer)
-                # self.scaler.update()
                 self.optimizer.zero_grad()
                 
                 if att_weights is not None:
@@ -378,12 +286,7 @@ class Engine:
                     binary_targets = binary_targets.unsqueeze(1)
 
                 metrics["Training/loss"] += accumulated_loss
-                # metrics["train_accuracy"] += (
-                #     (binary_preds == binary_targets).float().mean().item()
-                # )
-                # metrics["train_f1_score"] += binary_f1_score(
-                #     binary_preds.int(), binary_targets.int()
-                # ).item()
+
                 
             self.secondary_scheduler.step()
             # Log progress
@@ -419,110 +322,12 @@ class Engine:
             )
             self.console.print()
 
-
-
-            
-            #TODO: check if correct and do it for val
-            # def log_batch_metrics(self, batch_idx: int, metrics: Dict[str, float]):
-            #     """Log batch-level metrics to wandb"""
-            #     wandb.log(
-            #         {
-            #             "batch/loss": metrics["loss"] / (batch_idx + 1),
-            #             "batch/accuracy": metrics["accuracy"] / (batch_idx + 1),
-            #             "batch/f1_score": metrics["f1_score"] / (batch_idx + 1),
-            #             "batch/learning_rate": self.optimizer.param_groups[0]["lr"],
-            #         }
-            #     )
-            #batch_metrics = {"loss": accumulated_loss, "accuracy": (binary_preds == binary_targets).tolist(), "f1_score": binary_f1_score(binary_preds.int(), binary_targets.int()).item(),self.optimizer.param_groups[0]["lr"] }
             self.log_batch_metrics(batch_idx)   
             
                 
             del(images, labels, logits, loss)
         
         return {k: v / total_batches for k, v in metrics.items()}, att_weights, torch.cat(all_logits, dim=0), torch.cat(all_gts, dim=0)
-    
-    
-    def con_train_epoch(self, epoch, num_epochs):
-        self.model.train()
-        self.console.print(
-            f"Epoch [yellow]{epoch+1}/{num_epochs}[/yellow]", style="epoch"
-        )
-        self.console.print(f"TRAINING", style="train")
-
-        metrics = {"Training/loss": 0.0}
-        total_batches = len(self.train_loader)
-        
-        for batch_idx, batch in enumerate(self.train_loader):
-
-            images = batch["image"].to(self.device)
-            
-            if self.config["contrastive"] == 'slice':
-                labels = batch["annotation"].to(self.device)
-            elif self.config["contrastive"] == 'volume': 
-                labels = batch["label"].to(self.device)
-
-            proj_embeddings = self.model(images)
-
-            loss = self.criterion(proj_embeddings, labels)
-            scaled_loss = loss / self.gradient_accumulation_steps
-
-            # self.scaler.scale(scaled_loss).backward()
-            scaled_loss.backward()
-            accumulated_loss = loss.item()
-
-            # Gradient clipping and optimizer step
-            if (batch_idx + 1) % self.gradient_accumulation_steps == 0:
-                # if self.config["gradient_clip"] > 0:
-                #     # self.scaler.unscale_(self.optimizer)T
-                #     grad = torch.nn.utils.clip_grad_norm_(
-                #         self.model.parameters(), self.config["gradient_clip"]
-                #     )
-
-                self.optimizer.step()
-                # self.scaler.step(self.optimizer)
-                # self.scaler.update()
-                self.optimizer.zero_grad()
-                
-            
-
-
-                metrics["Training/loss"] += accumulated_loss
-                # metrics["train_accuracy"] += (
-                #     (binary_preds == binary_targets).float().mean().item()
-                # )
-                # metrics["train_f1_score"] += binary_f1_score(
-                #     binary_preds.int(), binary_targets.int()
-                # ).item()
-                
-            self.secondary_scheduler.step()
-            # Log progress
-            self.console.print(
-                f"Batch [cyan]{batch_idx+1}/{total_batches}[/cyan]", style="batch"
-            )   
-            self.console.print(
-                f">> Loss :[white]{accumulated_loss:.3f}[/white]", style="bright_cyan"
-            )
-            self.console.print()
-            
-            #TODO: check if correct and do it for val
-            # def log_batch_metrics(self, batch_idx: int, metrics: Dict[str, float]):
-            #     """Log batch-level metrics to wandb"""
-            #     wandb.log(
-            #         {
-            #             "batch/loss": metrics["loss"] / (batch_idx + 1),
-            #             "batch/accuracy": metrics["accuracy"] / (batch_idx + 1),
-            #             "batch/f1_score": metrics["f1_score"] / (batch_idx + 1),
-            #             "batch/learning_rate": self.optimizer.param_groups[0]["lr"],
-            #         }
-            #     )
-            #batch_metrics = {"loss": accumulated_loss, "accuracy": (binary_preds == binary_targets).tolist(), "f1_score": binary_f1_score(binary_preds.int(), binary_targets.int()).item(),self.optimizer.param_groups[0]["lr"] }
-            self.log_batch_metrics(batch_idx)   
-            
-                
-            del(images, labels, proj_embeddings, loss)
-        
-        return {k: v / total_batches for k, v in metrics.items()}
-    
     
 
     def validate(self, epoch, num_epochs):
@@ -539,8 +344,7 @@ class Engine:
         with torch.no_grad():
             for batch_idx, batch in enumerate(self.val_loader):
                 images = batch["image"].to(self.device)
-                #clinical_features = batch["clinical_features"].to(self.device)
-                #masks = batch["mask"].to(self.device)
+                clinical_features = batch["clinical_features"].to(self.device)
 
                 if self.num_classes == 1:
                     labels = batch["label"][:, 1].to(self.device)
@@ -548,14 +352,10 @@ class Engine:
                 else:
                     labels = batch["label"].to(self.device)
 
-                # # Apply label smoothing
-                # if self.label_smoothing > 0:
-                #     targets = self._apply_label_smoothing(targets)
 
-                logits,att_weights,_ = self.model(images)
-                #logits = self.model(images)
-                
-                # logits = nn.functional.softmax(logits,dim=-1)
+
+                logits,att_weights,_ = self.model(images, clinical_features)
+
                 loss = self.criterion(logits, labels)
                 
                 if att_weights is not None:
@@ -576,12 +376,6 @@ class Engine:
                 all_gts.append(labels.detach())
                 
                 metrics["Validation/loss"] += loss.item()
-                # metrics["val_accuracy"] += (
-                #     (binary_preds == binary_targets).float().mean().item()
-                # )
-                # metrics["val_f1_score"] += binary_f1_score(
-                #     binary_preds.int(), binary_targets.int()
-                # ).item()
 
                 # Log progress
                 self.console.print(
@@ -620,84 +414,6 @@ class Engine:
         return {k: v / total_batches for k, v in metrics.items()}, torch.cat(all_logits, dim=0), torch.cat(all_gts, dim=0)
 
 
-    def con_validate(self, epoch, num_epochs):
-        self.model.eval()
-        self.console.print(
-            f"Epoch [yellow]{epoch+1}/{num_epochs}[/yellow]", style="epoch"
-        )
-        self.console.print(f"VALIDATION", style="val")
-
-        metrics = {"Validation/loss": 0.0}
-        total_batches = len(self.val_loader)
-
-
-        with torch.no_grad():
-            for batch_idx, batch in enumerate(self.val_loader):
-                images = batch["image"].to(self.device)
-                # age = batch['age'].to(self.device)
-
-                if self.config['contrastive'] == 'slice': 
-                    labels = batch["annotation"].to(self.device)
-                else:
-                    labels = batch["label"].to(self.device)
-
-                proj_embeddings = self.model(images)
-                #logits = self.model(images)
-                
-
-                loss = self.criterion(proj_embeddings,labels)
-                
-
-                metrics["Validation/loss"] += loss.item()
-                # metrics["val_accuracy"] += (
-                #     (binary_preds == binary_targets).float().mean().item()
-                # )
-                # metrics["val_f1_score"] += binary_f1_score(
-                #     binary_preds.int(), binary_targets.int()
-                # ).item()
-
-                # Log progress
-                self.console.print(
-                    f"Batch [magenta]{batch_idx+1}/{total_batches}[/magenta]",
-                    style="val_log",
-                )    
-                                
-                self.console.print(
-                    f">> Loss :[white]{loss:.3f}[/white]", style="magenta"
-                )
-                self.console.print()
-
-                del(images, labels, proj_embeddings, loss)
-                
-            return {k: v / total_batches for k, v in metrics.items()}
-
-
-
-    # def update_scheduler(self, val_loss):
-    #     """Modified scheduler update with warmup"""
-    #     old_lr = self.optimizer.param_groups[0]['lr']
-
-    #     if self.current_step < self.warmup_steps:
-    #         # Linear warmup from 10% to 100% of initial learning rate
-    #         min_lr = self.initial_lr * 0.1
-    #         lr_range = self.initial_lr - min_lr
-    #         progress_fraction = float(self.current_step) / float(max(1, self.warmup_steps))
-    #         new_lr = min_lr + progress_fraction * lr_range
-
-    #         for pg in self.optimizer.param_groups:
-    #             pg['lr'] = new_lr
-
-    #         if self.current_step % 100 == 0:
-    #             print(f"Warmup step {self.current_step}/{self.warmup_steps}. "
-    #                   f"LR: {old_lr:.2e} -> {new_lr:.2e}")
-    #     else:
-    #         self.main_scheduler.step(val_loss)
-
-    #         new_lr = self.optimizer.param_groups[0]['lr']
-    #         if new_lr != old_lr:
-    #             print(f"Learning rate changed: {old_lr:.2e} -> {new_lr:.2e}")
-
-    #     self.current_step += 1
 
     def update_scheduler(self, val_loss):
         """Basic scheduler update without warmup"""
@@ -722,7 +438,6 @@ class Engine:
         start_epoch = 0
         best_model_state = None
         no_improvement_epochs = 0
-        epochs_early_stopping = 0 
         best_val_loss = float("inf")
         prev_train_metrics = {"Training/loss": 0.0}
         prev_val_metrics = {"Validation/loss": 0.0}
@@ -732,8 +447,6 @@ class Engine:
             start_epoch, _ = self.load_checkpoint(resume_from)
             print(f"Resuming from epoch {start_epoch}")
 
-        # print()
-        # self.console.print("CONFIGURATION:", style='yellow')
         self.console.print(
             f"Initial learning rate: [yellow]{self.initial_lr}[/yellow]", style="epoch"
         )
@@ -758,38 +471,21 @@ class Engine:
 
         for epoch in range(start_epoch, num_epochs):
 
-            if self.config["contrastive"] == 'None':
-                # Training phase 
-                train_metrics, att_weights, logits, gts = self.train_epoch(epoch, num_epochs)
-                comprehensive_train_metrics = metrics.calculate_metrics(logits, gts, 0.5, split="Training")
-                optimal_threshold = metrics.ghost(logits, gts, n_splits = self.config['n_splits'])
-                comprehensive_train_metrics_opthr = metrics.calculate_metrics(logits, gts, optimal_threshold, split="Training_OPTHR")
-                #train_metrics = self.train_epoch(epoch, num_epochs)
-                comprehensive_train_metrics.update({"epoch":epoch})
-                comprehensive_train_metrics_opthr.update({"epoch":epoch})
-                wandb.log(train_metrics)
-                wandb.log(comprehensive_train_metrics)
-                wandb.log(comprehensive_train_metrics_opthr)
-                
-                val_metrics,logits, gts = self.validate(epoch, num_epochs)
-                comprehensive_val_metrics = metrics.calculate_metrics(logits, gts, 0.5, split="Validation")
-                comprehensive_val_metrics_opthr = metrics.calculate_metrics(logits, gts, optimal_threshold, split="Validation_OPTHR")
-                
-                #optimal_threshold,_ = metrics.find_optimal_threshold(logits, gts,metric="f1_score")
-                #comprehensive_val_metrics_opthr = metrics.calculate_metrics(logits, gts, optimal_threshold, split="Validation_OPTHR")
-                comprehensive_val_metrics.update({"epoch":epoch})
-                comprehensive_val_metrics_opthr.update({"epoch":epoch})
-                wandb.log(val_metrics)
-                wandb.log(comprehensive_val_metrics)
-                wandb.log(comprehensive_val_metrics_opthr)
+            # Training phase 
+            train_metrics, att_weights, logits, gts = self.train_epoch(epoch, num_epochs)
+            comprehensive_train_metrics = metrics.calculate_metrics(logits, gts, 0.5, split="Training")
+
+            comprehensive_train_metrics.update({"epoch":epoch})
+            wandb.log(train_metrics)
+            wandb.log(comprehensive_train_metrics)
             
-            else : 
-                # Training phase 
-                train_metrics = self.con_train_epoch(epoch, num_epochs)
-                wandb.log(train_metrics)
-                
-                val_metrics = self.con_validate(epoch, num_epochs)
-                wandb.log(val_metrics)
+            val_metrics,logits, gts = self.validate(epoch, num_epochs)
+            comprehensive_val_metrics = metrics.calculate_metrics(logits, gts, 0.5, split="Validation")
+
+            comprehensive_val_metrics.update({"epoch":epoch})
+            wandb.log(val_metrics)
+            wandb.log(comprehensive_val_metrics)
+
 
 
             self.log_epoch_metrics(epoch, train_metrics, val_metrics)
@@ -817,8 +513,7 @@ class Engine:
 
             # Save best model based on validation loss
             if val_metrics["Validation/loss"] < best_val_loss:
-                improvement = best_val_loss - val_metrics["Validation/loss"]
-                # print(f"Validation loss improved by {improvement:.4f}")
+
                 best_val_loss = val_metrics["Validation/loss"]
                 best_model_state = {
                     "epoch": epoch,
@@ -832,10 +527,10 @@ class Engine:
                 no_improvement_epochs += 1
 
             # Track best F1 score
-            if self.config['contrastive'] == 'None':
-                if comprehensive_val_metrics["Validation/f1_score"] > self.best_val_f1:
-                    self.best_val_f1 = comprehensive_val_metrics["Validation/f1_score"]
-                # print(f"New best F1 score: {self.best_val_f1:.4f}")
+
+            if comprehensive_val_metrics["Validation/f1_score"] > self.best_val_f1:
+                self.best_val_f1 = comprehensive_val_metrics["Validation/f1_score"]
+
 
             # Early stopping check
             if no_improvement_epochs >= self.config["early_stopping_patience"]:
@@ -846,37 +541,25 @@ class Engine:
                 self.console.print(
                     f"Best validation loss: [red]{best_val_loss:.4f}[/red]", style="red"
                 )
-                if self.config['contrastive'] == 'None':
-                    self.console.print(
-                        f"Best validation F1: [red]{self.best_val_f1:.4f}[/red]", style="red"
-                    )
+
+                self.console.print(
+                    f"Best validation F1: [red]{self.best_val_f1:.4f}[/red]", style="red"
+                )
 
                 if best_model_state is not None:
                     self.console.print(
                         f"Restoring best model from epoch [red]{best_model_state['epoch']}[/red]",
                         style="red",
                     )
-                    #self.restore_best_cnn_model(best_model_state, epoch)
-                    if self.config['contrastive'] == 'None':
-                        self.restore_best_model(best_model_state,att_weights,epoch)
-                    else:
-                        self.restore_best_cnn_model(best_model_state,epoch)
+                    self.restore_best_model(best_model_state,att_weights,epoch)
                 break
             
-            # Learning rate minimum check
-            # if current_lr < 1e-8:
-            #     self.console.print("STOP TRAINING: learning rate < 1e-8.", style="red")
-            #     #self.restore_best_cnn_model(best_model_state, epoch)
-            #     self.restore_best_model(best_model_state,att_weights,epoch)
-            #     break
+
             
         if epoch == num_epochs - 1:
             self.console.print(f"Training completed. Restoring best model from epoch [yellow]{best_model_state['epoch']}[/yellow]", style="epoch")
-            #self.restore_best_cnn_model(best_model_state, epoch)
-            if self.config['contrastive'] == 'None':
-                self.restore_best_model(best_model_state,att_weights,epoch)
-            else: 
-                self.restore_best_cnn_model(best_model_state, epoch)
+            self.restore_best_model(best_model_state,att_weights,epoch)
+
 
 
     def restore_best_model(self, best_model_state, att_weigths, epoch):
@@ -885,10 +568,6 @@ class Engine:
             self.optimizer.load_state_dict(best_model_state["optimizer_state_dict"])
             log_attention_weights(att_weigths, step = epoch, save = False, save_path=f"attention_weights_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{epoch+1}.png")
 
-    def restore_best_cnn_model(self, best_model_state, epoch):
-        if best_model_state is not None:
-            self.model.load_state_dict(best_model_state["model_state_dict"])
-            self.optimizer.load_state_dict(best_model_state["optimizer_state_dict"])
 
     def save_checkpoint(self, epoch: int, metrics: Dict[str, float]):
         try:
@@ -928,9 +607,6 @@ class Engine:
         """Log batch-level metrics to wandb"""
         wandb.log(
             {
-                # "batch/loss": metrics["loss"] / (batch_idx + 1),
-                # "batch/accuracy": metrics["accuracy"] / (batch_idx + 1),
-                # "batch/f1_score": metrics["f1_score"] / (batch_idx + 1),
                 "batch": batch_idx,
                 "batch/learning_rate": self.optimizer.param_groups[0]["lr"],
             }
