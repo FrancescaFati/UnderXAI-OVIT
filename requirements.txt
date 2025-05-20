@@ -3,4 +3,4 @@ pandas
 nibabel
 scipy
 scikit-image
-torch  # Only if torch is actually used elsewhere in the repo or by this script 
+torch  

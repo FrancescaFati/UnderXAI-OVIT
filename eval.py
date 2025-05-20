@@ -1,13 +1,7 @@
 import torch
 import torch.nn as nn
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from pathlib import Path
 from typing import Optional, Dict
 from torch.utils.data import DataLoader
-import wandb
-import torch.nn.functional as F
 import logging
 import pandas as pd 
 from datetime import datetime
@@ -18,10 +12,17 @@ from engine import log_attention_weights
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+try:
+    import wandb
+    _wandb_available = True
+except ImportError:
+    wandb = None
+    _wandb_available = False
+
 class ModelEvaluator:
     """
     Evaluates a trained model on a given dataset and computes relevant metrics.
-    Handles loading from checkpoint, device management, and logging.
+    Handles loading from checkpoint, device management, and optional experiment tracking.
     """
     def __init__(
         self,
@@ -29,7 +30,8 @@ class ModelEvaluator:
         device: torch.device,
         test_loader: Optional[DataLoader] = None,
         checkpoint_path: Optional[str] = None,
-        config: Optional[Dict] = None
+        config: Optional[Dict] = None,
+        enable_wandb: bool = False
     ):
         """
         Initialize the model evaluator.
@@ -39,11 +41,15 @@ class ModelEvaluator:
             test_loader (DataLoader, optional): DataLoader for evaluation.
             checkpoint_path (str, optional): Path to model checkpoint.
             config (dict, optional): Configuration dictionary.
+            enable_wandb (bool): Whether to enable experiment tracking with wandb.
         """
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.config = config or {}
         self.test_loader = test_loader
-        self.num_classes = config["num_classes"]
+        self.num_classes = self.config.get("num_classes", 1)
+        self.enable_wandb = enable_wandb and _wandb_available
+        if enable_wandb and not _wandb_available:
+            logger.warning("wandb logging is enabled but wandb is not installed. Logging will be skipped.")
         try:
             if checkpoint_path:
                 checkpoint = torch.load(checkpoint_path, map_location=device)
@@ -105,7 +111,9 @@ class ModelEvaluator:
             # Compute and log comprehensive test metrics
             comprehensive_test_metrics = metrics.calculate_metrics(all_logits, all_gts, 0.5, split="Test")        
             metrics.log_roc_curve(all_logits, all_gts, prefix="Test")
-            wandb.log(comprehensive_test_metrics) 
+            # Optionally log to wandb if enabled and available
+            if self.enable_wandb:
+                wandb.log(comprehensive_test_metrics)
             # Save predictions and probabilities to Excel for further analysis
             df = pd.DataFrame({
                 'targets': all_gts.view(-1).cpu().numpy(),
@@ -114,6 +122,8 @@ class ModelEvaluator:
                 'preds': preds.view(-1).cpu().numpy(), 
                 'preds_opthr': preds_opthr.view(-1).cpu().numpy(),
             })
-            df.to_excel(f"TEST_{wandb.run.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
+            # Save with a generic timestamped filename
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            df.to_excel(f"TEST_RESULTS_{timestamp}.xlsx")
         return comprehensive_test_metrics
 

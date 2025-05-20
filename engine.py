@@ -353,7 +353,6 @@ class Engine:
                     labels = batch["label"].to(self.device)
 
 
-
                 logits,att_weights,_ = self.model(images, clinical_features)
 
                 loss = self.criterion(logits, labels)

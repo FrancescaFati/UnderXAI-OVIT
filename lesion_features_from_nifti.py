@@ -24,7 +24,7 @@ def compute_total_lesion_features(nii, lesion_values=[1, 9]):
     voxel_spacing = nii.header.get_zooms()  # dx, dy, dz in mm
     voxel_volume_mm3 = np.prod(voxel_spacing)
 
-    # lesion_totals = {}
+    lesion_totals = {}
 
     for lesion_value in lesion_values:
         lesion_mask = (data == lesion_value).astype(np.uint8)

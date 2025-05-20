@@ -8,8 +8,6 @@ import sys
 import subprocess
 import torch
 
-# Add MedViT to the Python path if needed (edit/remove for public repo)
-sys.path.append('/home/ffati/MedViT')
 
 # Device and AMP scaler setup
 # Use CUDA if available, else fallback to CPU
