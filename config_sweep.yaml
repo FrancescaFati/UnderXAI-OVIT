@@ -28,7 +28,7 @@ parameters:
     value: 8
 
   clinical_features:
-    value: False
+    value: True
   
   clinical_input_dim:
     value: 4

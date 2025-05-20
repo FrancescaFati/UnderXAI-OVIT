@@ -12,14 +12,13 @@ import wandb
 import torch
 from pathlib import Path
 from datetime import datetime
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader
 from pcs_dataset import PCSDataset
 from engine import Engine
-from model import Vit_Classifier, Slice_Contrastive, Volume_Contrastive
+from model import Vit_Classifier
 from eval import ModelEvaluator
 from utilis import detect_aval_cpus
 from rich import print
-import numpy as np
 import pandas as pd
 
 def sweep(config=None):

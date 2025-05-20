@@ -25,7 +25,7 @@ weight_decay: 1.0e-6
 
 # --- Data Paths ---
 # Set these to the correct locations for your data files
-train_paths: 'PATH/TO/train_dataset_ids.json'  # e.g., './data/train_dataset_ids.json'
-val_paths: 'PATH/TO/val_dataset_ids.json'      # e.g., './data/val_dataset_ids.json'
-test_paths: 'PATH/TO/test_dataset_ids.json'    # e.g., './data/test_dataset_ids.json'
+train_paths: '/home/ffati/UnderXAI-OVIT/ds.json'  # e.g., './data/train_dataset_ids.json'
+val_paths: '/home/ffati/UnderXAI-OVIT/ds.json'      # e.g., './data/val_dataset_ids.json'
+test_paths: '/home/ffati/UnderXAI-OVIT/ds.json'    # e.g., './data/test_dataset_ids.json'
 
