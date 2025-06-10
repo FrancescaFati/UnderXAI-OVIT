@@ -1,21 +1,42 @@
-# OC_seg_analysis & PCS Classification Pipeline
+# UnderXAI-OVIT: OC_seg_analysis & PCS Classification Pipeline
+
+![Model Architecture](model_architecture.png)
 
 This repository provides tools for:
 - Computing lesion features (volume, surface area, compactness, fractal dimension, and number of sub-lesions) from NIfTI segmentation files.
 - Training and evaluating a deep learning model for PCS (Primary Cytoreductive Surgery) classification using clinical and imaging data.
 - Bootstrapped model evaluation for robust metric estimation.
 
-## Requirements
+## Getting Started
+
+These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
+
+### Prerequisites
+
 - Python 3.7+
-- See `requirements.txt` for Python dependencies
+- Conda (Miniconda or Anaconda recommended)
 
-## Setup
-1. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Installation
 
----
+1.  **Clone the repository:**
+
+    ```bash
+    git clone https://github.com/your_username/UnderXAI-OVIT.git
+    cd UnderXAI-OVIT
+    ```
+
+2.  **Create and activate a Conda environment:**
+
+    ```bash
+    conda create -n underxai python=3.9  # Or your preferred Python version >= 3.7
+    conda activate underxai
+    ```
+
+3.  **Install dependencies:**
+
+    ```bash
+    pip install -r requirements.txt
+    ```
 
 ## 1. Lesion Feature Extraction
 This script computes lesion features from a local NIfTI segmentation file and saves results as a CSV file.
@@ -87,21 +108,11 @@ UnderXAI-OVIT/
 ├── main.py                # Main training/evaluation pipeline
 ├── test.py                # Bootstrapped model evaluation
 ├── lesion_features_from_nifti.py  # Lesion feature extraction
-├── model.py, engine.py, pcs_dataset.py, metrics.py, utilis.py  # Core modules
-├── config.yaml, config_sweep.yaml # Example configs
-├── ds.json                # Example dataset (anonymize for public use)
-├── requirements.txt
-├── README.md
-├── LICENSE
-└── ...
+├── model.py, engine.py, pcs_dataset.py, metrics.py, utilis.py  # Core modules for model definition, training loop, dataset handling, evaluation metrics, and utility functions.
+├── config.yaml, config_sweep.yaml # Example configurations for training and hyperparameter sweeps.
+├── ds.json                # Example dataset manifest (anonymized for public use).
+├── requirements.txt       # Python dependency list.
+├── README.md              # This README file.
+├── LICENSE                # Project license.
+└── ...                    # Other project files and directories.
 ```
-
----
-
-## Notes
-- All scripts are designed for public sharing: no hardcoded credentials or private data.
-- Update file paths and config values to match your environment.
-- For questions or contributions, please open an issue or pull request.
-
-## License
-[MIT](LICENSE)
