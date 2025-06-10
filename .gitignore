@@ -8,6 +8,7 @@ wandb/latest-run
 **/*.png
 **/*.xlsx
 wandb/latest-run
+**/*.nii
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
