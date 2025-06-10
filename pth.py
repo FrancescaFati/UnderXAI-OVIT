@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[11]:
-
-
 from monai.data import ImageDataset, DataLoader
 
 from monai.transforms import (
@@ -80,13 +74,13 @@ def process_images(file_list, transformations_im, transformations_mask, output_b
             
         torch.save(transformed_data, output_dir / output_file_name)
 
-transformations_im = Compose([#EnsureChannelFirst(), 
+transformations_im = Compose([
                               Spacing(pixdim=(1.0, 1.0, 1.0), mode='trilinear'), 
                               Lambda(lambda x: windowing(x)),
                               Resize(spatial_size=(224,224,256)),
                               ])
 
-transformations_mask = Compose([#EnsureChannelFirst(), 
+transformations_mask = Compose([
                               Spacing(pixdim=(1.0, 1.0, 1.0), mode='trilinear'), 
                               Resize(spatial_size=(224,224,256), mode = "nearest"),
                               ToTensor()])
