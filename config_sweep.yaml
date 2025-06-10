@@ -25,7 +25,7 @@ parameters:
     value: 2
 
   batch_size:
-    value: 8
+    value: 2
 
   clinical_features:
     value: True
@@ -43,7 +43,7 @@ parameters:
     value: 70
 
   epochs:
-    value: 100
+    value: 1
 
   feature_extractor:
     values: ["dinov2-small", "google-32"]
@@ -53,9 +53,6 @@ parameters:
 
   loss_function:
     value: 'WBCE'  
-
-  num_classes:
-    value: 1
 
   num_heads:
     value: 4
@@ -82,11 +79,11 @@ parameters:
   # --- Data Paths ---
   # Set these to the correct locations for your data files
   train_paths:
-    value: 'PATH/TO/train_dataset_ids.json'  # e.g., './data/train_dataset_ids.json'
+    value: '/home/ffati/UnderXAI-OVIT/ds.json'  # e.g., './data/train_dataset_ids.json'
   val_paths:
-    value: 'PATH/TO/val_dataset_ids.json'    # e.g., './data/val_dataset_ids.json'
+    value: '/home/ffati/UnderXAI-OVIT/ds.json'    # e.g., './data/val_dataset_ids.json'
   test_paths:
-    value: 'PATH/TO/test_dataset_ids.json'   # e.g., './data/test_dataset_ids.json'
+    value: '/home/ffati/UnderXAI-OVIT/ds.json'   # e.g., './data/test_dataset_ids.json'
 
 
 

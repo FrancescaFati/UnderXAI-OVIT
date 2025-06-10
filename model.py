@@ -197,10 +197,9 @@ class Vit_Classifier(nn.Module):
         else:
             self.clinical_encoder = None
             clinical_encoded_dim = 0
-        self.num_classes = config['num_classes']
+        self.num_classes = 1
         self.drodropout_rate = config['dropout']
         self.num_heads = config['num_heads']
-        self.attention_pooling = config['attention_pooling']
         self.max_slices = 256
         self.attention_resc = config['attention_resc']
         self.clinical_features = config["clinical_features"]

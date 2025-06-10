@@ -1,0 +1,2 @@
+/home/ffati/UnderXAI-OVIT/CT.nii
+/home/ffati/UnderXAI-OVIT/ovseg_predictions_pod_om/CT.nii

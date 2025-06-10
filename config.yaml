@@ -4,7 +4,7 @@
 # --- General Training Settings ---
 accumulation_steps: 16
 attention_resc: 2
-batch_size: 8
+batch_size: 2
 clinical_encoding_dim: 4
 clinical_features: True
 clinical_input_dim: 4
@@ -14,7 +14,6 @@ epochs: 1
 feature_extractor: "google-32"
 learning_rate: 0.0001
 loss_function: 'WBCE'
-num_classes: 1
 num_heads: 4
 optimizer: 'adamW'
 scheduler_gamma: 0.5

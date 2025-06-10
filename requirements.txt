@@ -3,4 +3,7 @@ pandas
 nibabel
 scipy
 scikit-image
-torch  
+torch
+pyyaml
+monai
+git+https://github.com/ThomasBudd/ovseg.git  

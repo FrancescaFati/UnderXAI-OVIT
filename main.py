@@ -20,6 +20,9 @@ from eval import ModelEvaluator
 from utilis import detect_aval_cpus
 from rich import print
 import pandas as pd
+import yaml
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def sweep(config=None):
     """
@@ -104,7 +107,6 @@ def sweep(config=None):
 
         # Create directory for saving models
         save_dir = Path('models').absolute()
-        print(f"[yellow]Creating directory: {save_dir}[/yellow]")
         save_dir.mkdir(parents=True, exist_ok=True)
 
         # Save only essential data that can be pickled
@@ -116,28 +118,32 @@ def sweep(config=None):
         }
         save_path = save_dir / f"final_model_{wandb.run.id}.pt"
         torch.save(save_dict, str(save_path))
-        print(f"[yellow]Saving model to: {save_path}[/yellow]")
+        print(f"[yellow]Saving final model to: {save_path}[/yellow]")
 
         # Evaluate the model on the test set and save metrics
         print()
         print("[orange3]TEST[/orange3]")
         evaluator = ModelEvaluator(model, device, config=config)
+        save_dir = Path('test').absolute()
+        save_dir.mkdir(parents=True, exist_ok=True)
         comprehensive_test_metrics = evaluator.predict(test_loader)
-        df_test_metrics = pd.DataFrame(comprehensive_test_metrics)
-        df_test_metrics.to_csv(f"test_metrics_{wandb.run.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv", index=False)
+        pd.DataFrame([comprehensive_test_metrics]).to_csv(f"test/test_metrics_{wandb.run.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
+        print(f"[orange3]Saving test results to: test/test_results_{wandb.run.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv[/orange3]")
+        print(f"[orange3]Saving test metrics to: test/test_metrics_{wandb.run.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv[/orange3]")
+        print()
 
 def load_config(config_path):
     """
-    Load a JSON config file from the given path and validate required fields.
+    Load a YAML config file from the given path and validate required fields.
     Args:
-        config_path (str): Path to the JSON config file.
+        config_path (str): Path to the YAML config file.
     Returns:
         dict: Loaded configuration dictionary.
     Raises:
         ValueError: If any required field is missing.
     """
     with open(config_path, 'r') as f:
-        config = json.load(f)
+        config = yaml.safe_load(f)
     # Check for required fields
     required_fields = ['train_paths', 'val_paths', 'test_paths', 'batch_size', 'epochs', 'learning_rate']
     for field in required_fields:
@@ -151,7 +157,7 @@ def main():
     Parses command-line arguments, loads config, sets device, and starts sweep.
     """
     parser = argparse.ArgumentParser(description="Train and evaluate PCS classifier.")
-    parser.add_argument('--config', required=True, help='Path to JSON config file')
+    parser.add_argument('--config', required=True, help='Path to YAML config file')
     args = parser.parse_args()
     config = load_config(args.config)
     global device

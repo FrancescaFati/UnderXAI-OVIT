@@ -1,35 +1,30 @@
 {"patients":[
     {
-        "Record ID": "IEO202069",
-        "Age at diagnosis": 52,
+        "Record ID": "XXXXXX",
+        "Age at diagnosis": 87,
         "Charlson Comorbidity Index": 2,
         "BMI (kg/m^2)": 24.2,
         "CA125 (U/mL)": 1447.8,
         "HE4 (pmol/l)": 1466.2,
         "Type of surgery": "PCS (primary cytoreductive surgery)",
         "Residual tumor": 0,
-        "Residual tumor: notes": -1,
-        "FF Residual tumor: notes": -1,
-        "Ovarian/Peritoneum/Fallopian Tube Cancer FIGO Staging": -1,
+        "Ovarian/Peritoneum/Fallopian Tube Cancer FIGO Staging": 3,
         "year": 2020,
-        
-        "image_path": "/home/ffati/DATA/PCS/PCS_GAMMA/2020/pth/IEO202069/CT_filtered.pth",       
-        "segmentation_path": "/home/ffati/DATA/PCS/2020/pth/IEO202069/OC_mask.pth"
+        "image_path": "/home/ffati/UnderXAI-OVIT/processed_data/pth/CT.pth",       
+        "segmentation_path": "/home/ffati/UnderXAI-OVIT/processed_data/pth/OC_mask.pth"
     },
     {
-        "Record ID": "IEO202066",
+        "Record ID": "XXXXXX",
         "Age at diagnosis": 61,
         "Charlson Comorbidity Index": 3,
         "BMI (kg/m^2)": 20.1,
         "CA125 (U/mL)": 1275.3,
         "HE4 (pmol/l)": 301.9,
         "Type of surgery": "PCS (primary cytoreductive surgery)",
-        "Residual tumor": 0,
-        "Residual tumor: notes": -1,
-        "FF Residual tumor: notes": -1,
+        "Residual tumor": 1,
         "Ovarian/Peritoneum/Fallopian Tube Cancer FIGO Staging": 3,
         "year": 2020,
-        "image_path": "/home/ffati/DATA/PCS/PCS_GAMMA/2020/pth/IEO202066/CT_filtered.pth",
-        "segmentation_path": "/home/ffati/DATA/PCS/2020/pth/IEO202066/OC_mask.pth"
+        "image_path": "/home/ffati/UnderXAI-OVIT/processed_data/pth/CT.pth",
+        "segmentation_path": "/home/ffati/UnderXAI-OVIT/processed_data/pth/OC_mask.pth"
     }
 ]}

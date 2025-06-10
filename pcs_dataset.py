@@ -82,6 +82,7 @@ class PCSDataset(Dataset):
                 self.stats['residual_tumor_counts'][original_label] += 1
                 label = torch.tensor(original_label, dtype=torch.long)
                 label = torch.where(label == 2, torch.tensor(1, dtype=torch.long), label)
+
                 if self.clinical_fe:
                     clinical_features = torch.tensor([
                         patient.get("Age at diagnosis", 0.0),

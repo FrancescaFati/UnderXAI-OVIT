@@ -113,9 +113,6 @@ def calculate_metrics(
         else None
     )
 
-    # Confusion matrix as a dictionary for better interpretability
-    confusion_matrix = {"TP": TP, "TN": TN, "FP": FP, "FN": FN}
-
     # Prefix metrics with split name if provided
     prefix = f"{split}/" if split is not None else ""
     return {
@@ -126,7 +123,10 @@ def calculate_metrics(
         f"{prefix}roc_auc": roc_auc,
         f"{prefix}pr_auc": pr_auc,
         f"{prefix}cohen_kappa": cohen_kappa,
-        f"{prefix}confusion_matrix": confusion_matrix,
+        f"{prefix}confusion_matrix/TP": TP,
+        f"{prefix}confusion_matrix/TN": TN,
+        f"{prefix}confusion_matrix/FP": FP,
+        f"{prefix}confusion_matrix/FN": FN,
     }
 
 

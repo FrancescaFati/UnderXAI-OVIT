@@ -7,6 +7,7 @@ import pandas as pd
 from datetime import datetime
 import metrics
 from engine import log_attention_weights
+from pathlib import Path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -31,7 +32,7 @@ class ModelEvaluator:
         test_loader: Optional[DataLoader] = None,
         checkpoint_path: Optional[str] = None,
         config: Optional[Dict] = None,
-        enable_wandb: bool = False
+        enable_wandb: bool = True
     ):
         """
         Initialize the model evaluator.
@@ -74,32 +75,25 @@ class ModelEvaluator:
         Returns:
             dict: Comprehensive test metrics as computed by the metrics module.
         """
-        all_preds, all_labels, all_probs = [], [], []
         all_logits = []
         all_gts = []
+
         self.model.eval()
         with torch.no_grad():
             for batch_index, batch in enumerate(loader):
                 images = batch['image'].to(self.device)
                 clinical_features = batch['clinical_features'].to(self.device)
-                # Handle binary and multi-class cases
-                if self.num_classes == 1:
-                    labels = batch["label"][:, 1].to(self.device)
-                else:
-                    labels = batch["label"].to(self.device)
+                labels = batch["label"][:, 1].to(self.device)
+
                 logits, att_weights, _ = self.model(images, clinical_features)
-                log_attention_weights(att_weights, step=batch_index, prefix="Test")
-                if self.num_classes == 1:
-                    probs = torch.sigmoid(logits)
-                    binary_preds = (probs.squeeze() > 0.5).float()
-                    binary_targets = labels
-                else:
-                    probs = torch.sigmoid(logits)
-                    binary_preds = logits.argmax(dim=1)
-                    binary_targets = labels.argmax(dim=1)
-                all_preds.append(binary_preds.cpu().numpy().reshape(-1))
-                all_labels.append(binary_targets.cpu().numpy().reshape(-1))
-                all_probs.append(probs.cpu().numpy().reshape(probs.shape[0], -1))
+
+                if att_weights is not None:
+                    log_attention_weights(att_weights, step=batch_index, prefix="Test")
+
+                probs = torch.sigmoid(logits)
+                binary_preds = (probs.squeeze() > 0.5).float()
+                binary_targets = labels
+ 
                 all_logits.append(logits.detach()) 
                 all_gts.append(labels.detach())
             # Concatenate all predictions and ground truths
@@ -107,10 +101,9 @@ class ModelEvaluator:
             all_gts = torch.cat(all_gts, dim=0)
             probabilities = torch.sigmoid(all_logits)
             preds = (probabilities >= 0.5).int()
-            preds_opthr = (probabilities >= optimal_threshold).int()
             # Compute and log comprehensive test metrics
             comprehensive_test_metrics = metrics.calculate_metrics(all_logits, all_gts, 0.5, split="Test")        
-            metrics.log_roc_curve(all_logits, all_gts, prefix="Test")
+            metrics.log_roc_curve(all_logits, all_gts, prefix="Test/")
             # Optionally log to wandb if enabled and available
             if self.enable_wandb:
                 wandb.log(comprehensive_test_metrics)
@@ -120,10 +113,10 @@ class ModelEvaluator:
                 'logits': all_logits.view(-1).cpu().numpy(),
                 'probabilities': probabilities.view(-1).cpu().numpy(), 
                 'preds': preds.view(-1).cpu().numpy(), 
-                'preds_opthr': preds_opthr.view(-1).cpu().numpy(),
             })
             # Save with a generic timestamped filename
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            df.to_excel(f"TEST_RESULTS_{timestamp}.xlsx")
+            save_dir = Path('test').absolute()
+            save_dir.mkdir(parents=True, exist_ok=True)
+            df.to_csv(f"test/test_results_{wandb.run.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
         return comprehensive_test_metrics
 

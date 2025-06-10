@@ -17,6 +17,7 @@ from rich import print
 from rich.console import Console
 from rich.theme import Theme
 import metrics
+from pathlib import Path
 
 # Optional dependencies
 try:
@@ -130,7 +131,6 @@ class Engine:
         self.patience_counter = 0
         self.current_step = 0
         self.initial_lr = config["learning_rate"]
-        self.num_classes = config["num_classes"]
         self.batch_size = config["batch_size"]
         self.clinical_features = config["clinical_features"]
         # For gradient accumulation
@@ -219,10 +219,7 @@ class Engine:
     
     def format_probs(self,probs):
         """Format probability pairs with consistent spacing"""
-        if self.num_classes == 2:
-            return [f"{round(float(pair[0]), 2):<6}, {round(float(pair[1]), 2):<6}" for pair in probs]
-        elif self.num_classes == 1:
-            return [f"{round(float(pair.item()), 2):<12}, " for pair in probs]
+        return [f"{round(float(pair.item()), 2):<12}, " for pair in probs]
 
     
     def train_epoch(self, epoch, num_epochs):
@@ -242,12 +239,8 @@ class Engine:
             images = batch["image"].to(self.device)
             clinical_features = batch["clinical_features"].to(self.device)
 
-            if self.num_classes == 1:
-                labels = batch["label"][:, 1].to(self.device)
-                labels = labels.unsqueeze(1)
-            else:
-                labels = batch["label"].to(self.device)
-
+            labels = batch["label"][:, 1].to(self.device)
+            labels = labels.unsqueeze(1)
 
             # Forward pass and loss calculation
             logits, att_weights, _ = self.model(images, clinical_features)
@@ -274,17 +267,10 @@ class Engine:
             
             with torch.no_grad():
                 
-                if self.num_classes == 1:
-                    probs = torch.sigmoid(logits)
-                    binary_preds = (probs > 0.5).float()
-                    binary_targets = labels
-                else:
-                    probs = logits
-                    binary_preds = logits.argmax(dim=1)
-                    binary_preds = binary_preds.unsqueeze(1)
-                    binary_targets = labels.argmax(dim=1)
-                    binary_targets = binary_targets.unsqueeze(1)
-
+                probs = torch.sigmoid(logits)
+                binary_preds = (probs > 0.5).float()
+                binary_targets = labels
+   
                 metrics["Training/loss"] += accumulated_loss
 
                 
@@ -346,30 +332,20 @@ class Engine:
                 images = batch["image"].to(self.device)
                 clinical_features = batch["clinical_features"].to(self.device)
 
-                if self.num_classes == 1:
-                    labels = batch["label"][:, 1].to(self.device)
-                    labels = labels.unsqueeze(1)
-                else:
-                    labels = batch["label"].to(self.device)
+                labels = batch["label"][:, 1].to(self.device)
+                labels = labels.unsqueeze(1)
 
-
-                logits,att_weights,_ = self.model(images, clinical_features)
+                logits, att_weights, _ = self.model(images, clinical_features)
 
                 loss = self.criterion(logits, labels)
                 
                 if att_weights is not None:
                     log_attention_weights(att_weights, step=epoch, prefix="Validation")
 
-                if self.num_classes == 1:
-                    probs = torch.sigmoid(logits)
-                    binary_preds = (probs > 0.5).float()
-                    binary_targets = labels
-                else:
-                    probs = logits
-                    binary_preds = logits.argmax(dim=1)
-                    binary_preds = binary_preds.unsqueeze(1)
-                    binary_targets = labels.argmax(dim=1)
-                    binary_targets = binary_targets.unsqueeze(1)
+                probs = torch.sigmoid(logits)
+                binary_preds = (probs > 0.5).float()
+                binary_targets = labels
+
 
                 all_logits.append(logits.detach())
                 all_gts.append(labels.detach())
@@ -433,18 +409,13 @@ class Engine:
             print(f"[green]Current Learning rate: {new_lr:.2e}[/green]")
             print()
 
-    def train(self, num_epochs: int, resume_from: str = None):
+    def train(self, num_epochs: int):
         start_epoch = 0
         best_model_state = None
         no_improvement_epochs = 0
         best_val_loss = float("inf")
         prev_train_metrics = {"Training/loss": 0.0}
         prev_val_metrics = {"Validation/loss": 0.0}
-
-
-        if resume_from:
-            start_epoch, _ = self.load_checkpoint(resume_from)
-            print(f"Resuming from epoch {start_epoch}")
 
         self.console.print(
             f"Initial learning rate: [yellow]{self.initial_lr}[/yellow]", style="epoch"
@@ -475,14 +446,13 @@ class Engine:
             comprehensive_train_metrics = metrics.calculate_metrics(logits, gts, 0.5, split="Training")
 
             comprehensive_train_metrics.update({"epoch":epoch})
-            wandb.log(train_metrics)
             wandb.log(comprehensive_train_metrics)
             
             val_metrics,logits, gts = self.validate(epoch, num_epochs)
             comprehensive_val_metrics = metrics.calculate_metrics(logits, gts, 0.5, split="Validation")
 
             comprehensive_val_metrics.update({"epoch":epoch})
-            wandb.log(val_metrics)
+
             wandb.log(comprehensive_val_metrics)
 
 
@@ -582,9 +552,13 @@ class Engine:
                 "config": {k: v for k, v in self.config.items()},
             }
 
-            save_path = f"best_model_{wandb.run.id}.pt"
+            save_dir = Path('checkpoints').absolute()
+            save_dir.mkdir(parents=True, exist_ok=True)
+            save_path = f"checkpoints/best_model_{wandb.run.id}.pt"
             torch.save(checkpoint, save_path)
             self.console.print(f"Saved checkpoint", style="epoch")
+            print(f"[yellow]Saving model checkpoint to: {save_path}[/yellow]")
+            print()
 
         except Exception as e:
             self.console.print(
@@ -618,8 +592,8 @@ class Engine:
         metrics = {
             "epoch": epoch,
             "hyperp/learning_rate": self.optimizer.param_groups[0]["lr"],
-            **{f"train/{k}": v for k, v in train_metrics.items()},
-            **{f"val/{k}": v for k, v in val_metrics.items()},
+            **{f"{k}": v for k, v in train_metrics.items()},
+            **{f"{k}": v for k, v in val_metrics.items()},
         }
         wandb.log(metrics)
 
