@@ -2,7 +2,6 @@ new_code/wandb
 /wandb 
 wandb/latest-run
 **/*.pth 
-**/*.png
 **/*.pt
 **/*.csv
 **/*.png
