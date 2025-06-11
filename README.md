@@ -3,7 +3,8 @@
 ![Model Architecture](model_architecture.png)
 
 This repository provides tools for:
-- Computing lesion features (volume, surface area, compactness, fractal dimension, and number of sub-lesions) from NIfTI segmentation files.
+- Computing lesion features (volume, surface area, compactness, and fractal dimension) from NIfTI segmentation files.
+- Pre-processing pipeline to adapt input images 
 - Training and evaluating a deep learning model for PCS (Primary Cytoreductive Surgery) classification using clinical and imaging data.
 - Bootstrapped model evaluation for robust metric estimation.
 
