@@ -4,7 +4,6 @@ wandb/latest-run
 **/*.pth 
 **/*.pt
 **/*.csv
-**/*.png
 **/*.xlsx
 wandb/latest-run
 **/*.nii
