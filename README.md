@@ -58,6 +58,16 @@ python ov_seg.py your_image_paths.txt --models pod_om
 - `--models`: Name(s) of models used during inference. Options are: `pod_om`, `abdominal_lesions`, `lymph_nodes`. Can combine multiple.
 - `--fast`: (Optional) Speeds up inference speed by disabling dynamic z-spacing, model ensembling and test-time augmentations.
 
+Citation:
+
+This functionality uses the publicly available OV-Seg repository by Thomas Budd et al.:
+@misc{budd2023ovseg,
+  author = {Thomas Budd},
+  title = {ovseg},
+  year = {2023},
+  howpublished = {\url{https://github.com/ThomasBudd/ovseg}},
+}
+
 ### 0.2 NIfTI to PTH Conversion
 Convert and preprocess NIfTI images into PyTorch tensors (.pth) using MONAI transforms, including intensity windowing and resizing.
 
@@ -73,7 +83,7 @@ Use the provided Jupyter notebook for visual inspection of CT images and segment
 - `Notebook`: visualization.ipynb
 Supports both raw and segmented CT volumes in `.nii` or `.pth` format
 
-![Example](ct_overlay_example.png)
+![Example](ct_ovseg_example.png)
 
 ---
 
