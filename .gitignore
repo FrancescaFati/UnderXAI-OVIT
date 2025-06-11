@@ -1,11 +1,9 @@
 new_code/wandb
 /wandb 
 wandb/latest-run
-**/*.pth 
 **/*.pt
 **/*.csv
 **/*.xlsx
-**/*.nii
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -20,16 +20,15 @@ from utilis import detect_aval_cpus
 import metrics
 
 # --- User configuration: Edit these paths for your environment ---
-TEST_DATA_PATH = "/home/ffati/DATA/test_dataset_ids.json"  # Path to test dataset JSON
-CONFIG_YAML_PATH = '/home/ffati/UnderXAI/config.yaml'       # Path to model config YAML
-CHECKPOINT_PATH = "/home/ffati/UnderXAI/models/final_model_dkrbrhk6.pt"  # Path to model checkpoint
+TEST_DATA_PATH = ""   # Path to test dataset JSON
+CONFIG_YAML_PATH = "" # Path to model config YAML
+CHECKPOINT_PATH = ""  # Path to model checkpoint
 # --------------------------------------------------------------
 
 # Prepare test dataset and loader
 # (Edit PCSDataset arguments as needed for your project)
 test_dataset = PCSDataset(
     data_file=TEST_DATA_PATH,
-    excluded_years=[2015],
     transform=None,
     is_training=False,
     seg=False,
@@ -106,5 +105,5 @@ for i in range(n_iterations):
 
 # Save bootstrapped metrics and predictions to CSV files
 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-pd.DataFrame(bootstrap_metrics).to_csv(f"METRICS_1000_bootstrap_dkrbrhk6_{timestamp}.csv", index=False)
-pd.DataFrame(bootstrap_alls).to_csv(f"ALLS_1000_bootstrap_dkrbrhk6_{timestamp}.csv", index=False)
+pd.DataFrame(bootstrap_metrics).to_csv(f"METRICS_1000_bootstrap_{timestamp}.csv", index=False)
+pd.DataFrame(bootstrap_alls).to_csv(f"ALLS_1000_bootstrap_{timestamp}.csv", index=False)

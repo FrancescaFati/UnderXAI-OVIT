@@ -18,6 +18,7 @@ from pathlib import Path
 from monai.data import MetaTensor
 import argparse
 import re # Import regex module
+import datetime
 
 def windowing(image: np.ndarray, window_level: int = 40, window_width: int = 400) -> np.ndarray:
     """
@@ -51,8 +52,15 @@ def process_images(file_list, transformations_im, transformations_mask, output_b
         
         is_prediction_mask = 'ovseg_predictions_pod_om' in file_path
         
-        # Construct output directory
-        output_dir = Path(output_base_dir) / "pth" 
+        # Extract unique identifier for the output directory
+        # Assuming id_name is the stem of the original NIfTI file (e.g., 'patient_001_CT' from 'patient_001_CT.nii.gz')
+        id_name = Path(file_path).stem
+        
+        # Get current year
+        current_year = datetime.datetime.now().year
+        
+        # Construct output directory with id_name and year
+        output_dir = Path(output_base_dir) / str(current_year) / id_name / "pth" 
         output_dir.mkdir(parents=True, exist_ok=True)
                 
         nifti_img = nib.load(file_path)
