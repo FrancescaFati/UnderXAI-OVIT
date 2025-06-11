@@ -72,7 +72,8 @@ python pth.py your_nifti_image_paths.txt --output_dir ./processed_data
 Use the provided Jupyter notebook for visual inspection of CT images and segmentations.
 - `Notebook`: visualization.ipynb
 Supports both raw and segmented CT volumes in `.nii` or `.pth` format
-Interactive viewer with slice navigation and overlay controls
+
+![Example](ct_overlay_example.png)
 
 ---
 
