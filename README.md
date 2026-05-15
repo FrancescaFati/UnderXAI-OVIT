@@ -190,3 +190,5 @@ UnderXAI-OVIT/
 ├── LICENSE                # Project license.
 └── ...                    # Other project files and directories.
 ```
+
+The work is part of the project Under-XAI: understanding ovarian cancer initiation and progression through explainable AI. Project code: PNRR-MAD-2022-12376574.
